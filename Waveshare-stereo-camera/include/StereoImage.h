@@ -9,7 +9,12 @@ namespace waveshare
         cv::Mat image2;
 
         StereoImage() = default;
+        StereoImage(StereoImage&) = default;
         StereoImage(StereoImage&&);
+        StereoImage& operator=(StereoImage&&) = default;
+
+        cv::Mat getCombinedImage();
+        void saveToFile(const std::string& filename, const bool& seperateFiles);
     };
 }
 

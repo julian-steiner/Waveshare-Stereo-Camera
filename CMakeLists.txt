@@ -23,11 +23,9 @@ set(Library_PCH
 )
 
 add_library(${CMAKE_PROJECT_NAME} ${Library_SRC})
-
 target_precompile_headers(${CMAKE_PROJECT_NAME} PUBLIC ${Library_PCH})
-
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCV_LIBS})
 
-add_executable(${CMAKE_PROJECT_NAME}-ConnectionTest test.cpp)
 
-target_link_libraries(${CMAKE_PROJECT_NAME}-ConnectionTest ${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}-VideoTest demoPrograms/test.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME}-VideoTest ${CMAKE_PROJECT_NAME})

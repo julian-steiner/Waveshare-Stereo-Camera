@@ -16,6 +16,7 @@ include_directories(
 set(Library_SRC
     ${WaveShare-stereo-camera_SRC}/StereoImage.cpp
     ${WaveShare-stereo-camera_SRC}/StereoCamera.cpp
+    ${WaveShare-stereo-camera_SRC}/ConfigHandler.cpp
 )
 
 set(Library_PCH
@@ -26,6 +27,8 @@ add_library(${CMAKE_PROJECT_NAME} ${Library_SRC})
 target_precompile_headers(${CMAKE_PROJECT_NAME} PUBLIC ${Library_PCH})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCV_LIBS})
 
+add_executable(${CMAKE_PROJECT_NAME}-ImageCapturingDemo demoPrograms/ImageCapturingDemo.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME}-ImageCapturingDemo ${CMAKE_PROJECT_NAME})
 
-add_executable(${CMAKE_PROJECT_NAME}-VideoTest demoPrograms/test.cpp)
-target_link_libraries(${CMAKE_PROJECT_NAME}-VideoTest ${CMAKE_PROJECT_NAME})
+add_executable(${CMAKE_PROJECT_NAME}-CalibrationDemo demoPrograms/CalibrationDemo.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME}-CalibrationDemo ${CMAKE_PROJECT_NAME})

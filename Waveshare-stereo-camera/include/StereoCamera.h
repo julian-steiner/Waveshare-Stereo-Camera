@@ -15,6 +15,7 @@ namespace waveshare
         StereoCamera(int cameraPort1, int cameraPort2);
 
         StereoImage read();
+        void calibrate();
     };
 }
 

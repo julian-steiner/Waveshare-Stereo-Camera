@@ -1,16 +1,14 @@
 #include "ConfigHandler.h"
+#include "StereoCamera.h"
 
 #include <iostream>
 
 int main()
 {
-    cfg::ConfigHandler handler;
-
-    handler.createDefaultConfig();
+    waveshare::StereoCamera camera(2, 4);
+    cfg::createDefaultConfig();
 
     std::cout << "created Config" << std::endl;
 
-    cfg::CalibrationConfig data = handler.readConfig();
-
-    std::cout << data << std::endl;
+    camera.generateCalibrationImages();
 }

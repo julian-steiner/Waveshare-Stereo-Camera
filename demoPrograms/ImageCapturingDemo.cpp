@@ -7,13 +7,22 @@ int main()
     waveshare::StereoCamera camera(2, 4);
     waveshare::StereoImage img;
 
-    img = camera.read();
+    std::cout << "Press ENTER or q to stop the stream and save the last image" << std::endl;
 
-    cv::imshow("image 1", img.image1);
-    cv::imshow("image 2", img.image2);
-    cv::imshow("stereo image", img.getCombinedImage());
+    while (true)
+    {
+        img = camera.read();
 
-    cv::waitKey(0);
+        img.show("combinedImage", true);
+        img.show("separateImage", false);
 
+        int keyCode = cv::waitKey(1); 
+        if (keyCode == 113 || keyCode == 13)
+        {
+            break;
+        }
+    }
+
+    img.saveToFile("images/testImage.png", true);
     img.saveToFile("images/testImage.png", false);
 }

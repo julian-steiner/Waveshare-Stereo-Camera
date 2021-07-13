@@ -17,6 +17,7 @@ set(Library_SRC
     ${WaveShare-stereo-camera_SRC}/StereoImage.cpp
     ${WaveShare-stereo-camera_SRC}/StereoCamera.cpp
     ${WaveShare-stereo-camera_SRC}/ConfigHandler.cpp
+    ${WaveShare-stereo-camera_SRC}/CameraCalibrationAssistant.cpp
 )
 
 set(Library_PCH

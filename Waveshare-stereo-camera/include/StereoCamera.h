@@ -5,6 +5,17 @@
 
 namespace waveshare
 {
+    class StereoCamera;
+
+    namespace CalibrationAssistant
+    {
+        void generateCalibrationImages(StereoCamera* camera);
+
+    }
+}
+
+namespace waveshare
+{
     class StereoCamera
     {
         cv::VideoCapture camera1;
@@ -15,7 +26,7 @@ namespace waveshare
         StereoCamera(int cameraPort1, int cameraPort2);
 
         StereoImage read();
-        void calibrate();
+        void generateCalibrationImages();
     };
 }
 

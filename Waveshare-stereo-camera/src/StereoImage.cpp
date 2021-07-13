@@ -51,3 +51,17 @@ void StereoImage::show(const std::string& windowname, const bool& combined)
         cv::imshow(windowname2.str(), image2);
     }
 }
+
+void StereoImage::fromFile(const std::string& filepath)
+{
+    try
+    {
+        image1 = cv::imread(filepath.substr(0, filepath.find(".")) + "_left" + filepath.substr(filepath.find(".")));
+        image2 = cv::imread(filepath.substr(0, filepath.find(".")) + "_right" + filepath.substr(filepath.find(".")));
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    
+}

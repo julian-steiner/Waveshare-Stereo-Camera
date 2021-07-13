@@ -51,8 +51,3 @@ StereoImage StereoCamera::read()
     camera2.read(imageBuffer.image2);
     return std::move(imageBuffer);
 }
-
-void StereoCamera::generateCalibrationImages()
-{
-    CalibrationAssistant::generateCalibrationImages(this);
-}

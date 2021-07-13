@@ -18,12 +18,12 @@ namespace waveshare
         StereoImage(ImageSize size);
         StereoImage(StereoImage&) = default;
         StereoImage(StereoImage&&);
-        StereoImage& operator=(StereoImage&&) = default;
+        StereoImage& operator=(const StereoImage&) = default;
 
         cv::Mat getCombinedImage();
         void show(const std::string& windowname, const bool& combined = false);
         void saveToFile(const std::string& filename, const bool& combined = false);
-        void fromFile(const std::string& filename);
+        void fromFile(const std::string& filepath);
     };
 }
 

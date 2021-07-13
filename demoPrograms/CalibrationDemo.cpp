@@ -1,14 +1,21 @@
 #include "ConfigHandler.h"
 #include "StereoCamera.h"
+#include "CameraCalibrationAssistant.h"
 
 #include <iostream>
 
 int main()
 {
-    waveshare::StereoCamera camera(2, 4);
-    cfg::createDefaultConfig();
+    std::cout << "Press 1 if you want to load a default config and create the images for calibration" << std::endl;
+    int keyCode = std::cin.get();
+    
+    if (keyCode == 49)
+    {
+        waveshare::StereoCamera camera(2, 4);
+        cfg::createDefaultConfig();
 
-    std::cout << "created Config" << std::endl;
+        waveshare::CalibrationAssistant::generateCalibrationImages(&camera);
+    }
 
-    camera.generateCalibrationImages();
+    waveshare::CalibrationAssistant::computeCalibrationMatrices();
 }

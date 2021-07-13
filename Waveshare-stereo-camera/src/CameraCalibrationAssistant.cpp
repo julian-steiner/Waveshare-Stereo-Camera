@@ -10,19 +10,149 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
 
     while (counter < config.numberOfFrames)
     {
-        camera->read().show("Preview", false);
+        camera->read().show("Live View", false);
         int keyCode = cv::waitKey(1);
         if (keyCode == 13)
         {
-            std::stringstream filename;
-            filename << config.filepathToFrames << counter << ".jpg";
-            std::cout << filename.str() << std::endl;
-            camera->read().saveToFile(filename.str(), true);
-            counter++;
+            StereoImage img = camera->read();
+            StereoImageChessboardData data;
+
+            findChessboardCorners(img, data, config);
+
+            if (data.foundLeft && data.foundRight)
+            {
+                std::stringstream filename;
+                filename << config.filepathToFrames << counter << ".jpg";
+                std::cout << filename.str() << std::endl;
+                img.saveToFile(filename.str(), false);
+                counter++;
+            }
         }
     }
 }
 
-void CalibrationAssistant::calibrateCamera(StereoCamera* camera)
+void CalibrationAssistant::findChessboardCorners(const StereoImage& image, StereoImageChessboardData& data, const cfg::CalibrationConfig& config)
 {
+    const cv::Mat& leftImage = image.image1;
+    const cv::Mat& rightImage = image.image2;
+
+    cv::Mat grayLeft;
+    cv::Mat grayRight;
+
+    cv::cvtColor(leftImage, grayLeft, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(rightImage, grayRight, cv::COLOR_BGR2GRAY);
+
+    data.foundLeft = cv::findChessboardCorners(grayLeft, {config.boardHeight, config.boardWidth}, data.cornersLeft, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
+    data.foundRight = cv::findChessboardCorners(grayRight, {config.boardHeight, config.boardWidth}, data.cornersRight, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
+
+    //if (data.foundLeft)
+    //{
+        //cv::cornerSubPix(grayLeft, data.cornersLeft, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
+    //}
+    //if (data.foundRight)
+    //{
+        //cv::cornerSubPix(grayRight, data.cornersLeft, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
+    //}
+}
+
+double CalibrationAssistant::calibrateCamera(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
+{
+    cv::calibrateCamera(objectPoints.objectPointsLeft, imagePoints.imagePointsLeft, imageSize, intrinsics.cameraMatrixLeft, intrinsics.distortionCoefficientsLeft, extrinsics.rotationVectorsLeft, extrinsics.translationVectorsLeft, flags);
+    cv::calibrateCamera(objectPoints.objectPointsRight, imagePoints.imagePointsRight, imageSize, intrinsics.cameraMatrixRight, intrinsics.distortionCoefficientsRight, extrinsics.rotationVectorsRight, extrinsics.translationVectorsRight, flags);
+    return 0;
+}
+
+void CalibrationAssistant::computeLensInterpolation(const StereoCameraIntrinsics& intrinstics, const cv::Size& imageSize, StereoCameraLensInterpolation& interpolation)
+{
+    cv::initUndistortRectifyMap(intrinstics.cameraMatrixLeft, intrinstics.distortionCoefficientsLeft, cv::Matx33f::eye(), intrinstics.cameraMatrixLeft, imageSize, CV_32FC1, interpolation.mapXLeft, interpolation.mapYLeft);
+    cv::initUndistortRectifyMap(intrinstics.cameraMatrixRight, intrinstics.distortionCoefficientsRight, cv::Matx33f::eye(), intrinstics.cameraMatrixRight, imageSize, CV_32FC1, interpolation.mapXRight, interpolation.mapYRight);
+}
+
+void CalibrationAssistant::computeCalibrationMatrices()
+{
+    cfg::CalibrationConfig config = cfg::readConfig();
+
+    std::vector<waveshare::StereoImage> images;
+    images.reserve(config.numberOfFrames);
+
+    // Load in all the images from the folder
+    for (int i = 0; i < config.numberOfFrames; i++)
+    {
+        std::stringstream filepath; 
+        filepath << config.filepathToFrames << i << ".jpg";
+
+        images.emplace_back(waveshare::StereoImage());
+        images.back().fromFile(filepath.str());
+    }
+
+    if (images.size() == config.numberOfFrames) {}
+    else std::cerr << "There was an error loading the calibrationImages" << std::endl;
+
+    // Create arrays to store the points
+    StereoImageObjectPoints objectPoints;
+    StereoImageImagePoints imagePoints;
+
+    // Define the objectPoints per image
+    std::vector<cv::Point3f> objp;
+    for (int i = 0; i < config.boardHeight; i++)
+    {
+        for (int a = 0; a < config.boardWidth; a++)
+        {
+            objp.push_back(cv::Point3f(a * config.squareSize, i * config.squareSize, 0));
+        }
+    }
+
+    // Go through every frame and grab the object and image points
+    for (int i = 0; i < config.numberOfFrames; i++)
+    {
+        StereoImage& image = images.at(i);
+        StereoImageChessboardData data;
+
+        findChessboardCorners(image, data, config);
+        
+        if (data.foundLeft)
+        {
+            imagePoints.imagePointsLeft.push_back(data.cornersLeft);
+            objectPoints.objectPointsLeft.push_back(objp);
+
+            cv::drawChessboardCorners(image.image1, {config.boardHeight, config.boardWidth}, cv::Mat(data.cornersLeft), data.foundLeft);
+        }
+
+        if (data.foundRight)
+        {
+            imagePoints.imagePointsRight.push_back(data.cornersRight);
+            objectPoints.objectPointsRight.push_back(objp);
+
+            cv::drawChessboardCorners(image.image2, {config.boardHeight, config.boardWidth}, cv::Mat(data.cornersRight), data.foundRight);
+        }
+    }
+
+    // calibrating the camera
+    StereoCameraIntrinsics intrinsics;
+    StereoCameraExtrinsics extrinsics;
+    int flags = cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_K3 + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_PRINCIPAL_POINT;
+
+    calibrateCamera(objectPoints, imagePoints, intrinsics, extrinsics, images.at(0).image1.size(), flags);
+
+    // computing lens distortion
+    StereoCameraLensInterpolation interpolation;
+    //computeLensInterpolation(intrinsics, images.at(0).image1.size(), interpolation);
+
+    cv::Matx33f newCameraMatrix = cv::Matx33f::eye();
+    cv::fisheye::estimateNewCameraMatrixForUndistortRectify(intrinsics.cameraMatrixLeft, intrinsics.cameraMatrixRight, images.at(0).image1.size(), cv::Matx33d::eye(), newCameraMatrix, 1);
+    
+
+    for (waveshare::StereoImage image : images)
+    {
+        cv::Mat undistorted;
+        cv::Mat img = image.image1;
+        cv::imshow("before", img);
+
+        //cv::fisheye::undistortImage(img, undistorted, intrinsics.cameraMatrixLeft, intrinsics.distortionCoefficientsLeft, newCameraMatrix);
+
+        //cv::remap(img, undistorted, interpolation.mapXRight, interpolation.mapYRight, cv::INTER_LINEAR);
+        cv::imshow("Corrected", undistorted);
+
+        cv::waitKey(0);
+    }
 }

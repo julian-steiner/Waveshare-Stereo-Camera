@@ -15,8 +15,8 @@ namespace cfg
         std::string filepathToFrames;
 
     public:
-        CalibrationConfig() : numberOfFrames(10), boardWidth(9), boardHeight(6), squareSize(50), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/") {}
-        explicit CalibrationConfig(int) : numberOfFrames(10), boardWidth(9), boardHeight(6), squareSize(50), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/"){}
+        CalibrationConfig() : numberOfFrames(20), boardWidth(8), boardHeight(6), squareSize(20), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/") {}
+        explicit CalibrationConfig(int) : numberOfFrames(5), boardWidth(8), boardHeight(6), squareSize(20), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/"){}
 
         void write(cv::FileStorage& fs) const;
 

@@ -29,11 +29,15 @@ namespace waveshare
 
     struct StereoCameraIntrinsics
     {
-        cv::Matx33f cameraMatrixLeft = cv::Matx33f::eye();
+        cv::Mat cameraMatrixLeft;
+        cv::Mat newCameraMatrixLeft;
         cv::Mat distortionCoefficientsLeft = cv::Mat::zeros(8, 1, CV_64F);
+        cv::Rect roiLeft;
 
         cv::Matx33f cameraMatrixRight = cv::Matx33f::eye();
+        cv::Matx33f newCameraMatrixRight = cv::Matx33f::eye();
         cv::Mat distortionCoefficientsRight = cv::Mat::zeros(8, 1, CV_64F);
+        cv::Rect roiRight;
     };
 
     struct StereoCameraExtrinsics
@@ -43,12 +47,31 @@ namespace waveshare
 
         std::vector<cv::Mat> rotationVectorsRight;
         std::vector<cv::Mat> translationVectorsRight;
+
+        cv::Mat rotationVectors;
+        cv::Mat translationVectors;
+        cv::Mat essentialMatrix;
+        cv::Mat fundamentalMatrix;
     };
 
     struct StereoCameraLensInterpolation
     {
         cv::Mat mapXLeft, mapXRight;
         cv::Mat mapYLeft, mapYRight;
+    };
+
+    struct StereoCameraRectification
+    {
+        cv::Mat rectLeft;
+        cv::Mat rectRight;
+
+        cv::Mat projMatrixLeft;
+        cv::Mat projMatrixRight;
+
+        cv::Mat Q;
+
+        cv::Mat stereoMapLeft;
+        cv::Mat stereoMapRight;
     };
 
     class CalibrationAssistant

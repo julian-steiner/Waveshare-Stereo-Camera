@@ -8,10 +8,13 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
 
     int counter = 0;
 
+    // Create a video stream 
     while (counter < config.numberOfFrames)
     {
         camera->read().show("Live View", false);
         int keyCode = cv::waitKey(1);
+
+        // If the user presses ENTER, validate the image
         if (keyCode == 13)
         {
             StereoImage img = camera->read();
@@ -19,6 +22,7 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
 
             findChessboardCorners(img, data, config);
 
+            // If the input is valid, save the image
             if (data.foundLeft && data.foundRight)
             {
                 std::stringstream filename;
@@ -36,87 +40,99 @@ void CalibrationAssistant::findChessboardCorners(const StereoImage& image, Stere
     const cv::Mat& leftImage = image.image1;
     const cv::Mat& rightImage = image.image2;
 
+    // Generates gray versions of the images to find the corners
     cv::Mat grayLeft;
     cv::Mat grayRight;
-
     cv::cvtColor(leftImage, grayLeft, cv::COLOR_BGR2GRAY);
     cv::cvtColor(rightImage, grayRight, cv::COLOR_BGR2GRAY);
 
-    data.foundLeft = cv::findChessboardCorners(grayLeft, {config.boardHeight, config.boardWidth}, data.cornersLeft, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
-    data.foundRight = cv::findChessboardCorners(grayRight, {config.boardHeight, config.boardWidth}, data.cornersRight, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
+    // Find the corners on both images
+    data.foundLeft = cv::findChessboardCorners(grayLeft,
+                                               {config.boardWidth, config.boardHeight},
+                                               data.cornersLeft,
+                                               cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
 
-    if (data.foundLeft)
+    data.foundRight = cv::findChessboardCorners(grayRight,
+                                                {config.boardWidth, config.boardHeight},
+                                                data.cornersRight,
+                                                cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE + cv::CALIB_CB_FAST_CHECK);
+
+    // If the corners are found, refine the corner location to get Positions at subPixel accuracy
+    if (data.foundLeft && data.foundRight)
     {
-        cv::cornerSubPix(grayLeft, data.cornersLeft, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
-    }
-    if (data.foundRight)
-    {
-        cv::cornerSubPix(grayRight, data.cornersLeft, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
+        cv::cornerSubPix(grayLeft,
+                        data.cornersLeft,
+                        cv::Size(11, 11),
+                        cv::Size(-1, -1),
+                        cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
+
+        cv::cornerSubPix(grayRight,
+                         data.cornersLeft,
+                         cv::Size(11, 11),
+                         cv::Size(-1, -1),
+                         cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
     }
 }
 
-double CalibrationAssistant::calibrateCamera(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
+void CalibrationAssistant::calibrateIntrinsics(const StereoImageObjectPoints& objectPoints, const std::vector<std::vector<cv::Point2f>>& imagePoints, CameraIntrinsics& intrinsics, CameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
 {
-    // Calibrate Left Camera
-    cv::calibrateCamera(objectPoints.objectPointsLeft,
-                        imagePoints.imagePointsLeft,
-                        imageSize, intrinsics.cameraMatrixLeft,
-                        intrinsics.distortionCoefficientsLeft,
-                        extrinsics.rotationVectorsLeft,
-                        extrinsics.translationVectorsLeft,
+    cv::calibrateCamera(objectPoints.objectPoints,
+                        imagePoints,
+                        imageSize, intrinsics.cameraMatrix,
+                        intrinsics.distortionCoefficients,
+                        extrinsics.rotationVectors,
+                        extrinsics.translationVectors,
                         flags);
+}
 
-    intrinsics.newCameraMatrixLeft = cv::getOptimalNewCameraMatrix(intrinsics.cameraMatrixLeft,
-                                                                    intrinsics.distortionCoefficientsLeft,
-                                                                    imageSize,
-                                                                    1,
-                                                                    imageSize, 
-                                                                    0);
-
-    // Calibrate Right Camera
-    cv::calibrateCamera(objectPoints.objectPointsRight,
-                        imagePoints.imagePointsRight,
-                        imageSize,
-                        intrinsics.cameraMatrixRight,
-                        intrinsics.distortionCoefficientsRight,
-                        extrinsics.rotationVectorsRight,
-                        extrinsics.translationVectorsRight,
-                        flags);
-                        
-    intrinsics.newCameraMatrixRight = cv::getOptimalNewCameraMatrix(intrinsics.cameraMatrixRight,
-                                                                    intrinsics.distortionCoefficientsRight,
-                                                                    imageSize,
-                                                                    0,
-                                                                    imageSize,
-                                                                    0);
-
-    int stereoFlags = 0;
-    stereoFlags |= cv::CALIB_FIX_INTRINSIC;
-    cv::TermCriteria stereoCriteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER, 30, 1e-6);
-
-    cv::stereoCalibrate(objectPoints.objectPointsLeft,
+void CalibrationAssistant::calibrateStereoCamera(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags, const cv::TermCriteria& criteria)
+{
+    cv::stereoCalibrate(objectPoints.objectPoints,
                         imagePoints.imagePointsLeft,
                         imagePoints.imagePointsRight,
-                        intrinsics.newCameraMatrixLeft,
-                        intrinsics.distortionCoefficientsLeft,
-                        intrinsics.newCameraMatrixRight,
-                        intrinsics.distortionCoefficientsRight,
+                        intrinsics.left.newCameraMatrix,
+                        intrinsics.left.distortionCoefficients,
+                        intrinsics.right.newCameraMatrix,
+                        intrinsics.right.distortionCoefficients,
                         imageSize,
                         extrinsics.rotationVectors,
                         extrinsics.translationVectors,
                         extrinsics.essentialMatrix,
                         extrinsics.fundamentalMatrix,
-                        stereoFlags,
-                        stereoCriteria);
-
-    return 0;
+                        flags,
+                        criteria);
 }
 
-void CalibrationAssistant::computeLensInterpolation(const StereoCameraIntrinsics& intrinstics, const cv::Size& imageSize, StereoCameraLensInterpolation& interpolation)
+double CalibrationAssistant::calibrateStereoCameraSetup(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
 {
-    cv::initUndistortRectifyMap(intrinstics.newCameraMatrixLeft, intrinstics.distortionCoefficientsLeft, cv::Matx33f::eye(), intrinstics.newCameraMatrixLeft, imageSize, CV_32FC1, interpolation.mapXLeft, interpolation.mapYLeft);
-    
-    cv::initUndistortRectifyMap(intrinstics.newCameraMatrixRight, intrinstics.distortionCoefficientsRight, cv::Matx33f::eye(), intrinstics.newCameraMatrixRight, imageSize, CV_32FC1, interpolation.mapXRight, interpolation.mapYRight);
+    // Calibrate both cameras
+
+    calibrateIntrinsics(objectPoints, imagePoints.imagePointsLeft, intrinsics.left, extrinsics.left, imageSize, flags);
+    calibrateIntrinsics(objectPoints, imagePoints.imagePointsRight, intrinsics.right, extrinsics.right, imageSize, flags);
+                        
+    // Generate new, refined camera matrixes 
+    intrinsics.right.newCameraMatrix = cv::getOptimalNewCameraMatrix(intrinsics.right.cameraMatrix,
+                                                                    intrinsics.right.distortionCoefficients,
+                                                                    imageSize,
+                                                                    1,
+                                                                    imageSize,
+                                                                    &intrinsics.right.roi);
+
+    intrinsics.left.newCameraMatrix = cv::getOptimalNewCameraMatrix(intrinsics.left.cameraMatrix,
+                                                                    intrinsics.left.distortionCoefficients,
+                                                                    imageSize,
+                                                                    1,
+                                                                    imageSize, 
+                                                                    &intrinsics.left.roi);
+
+    // Calibrate the camera as a stereo setup
+    int stereoFlags = 0;
+    stereoFlags |= cv::CALIB_FIX_INTRINSIC;
+    cv::TermCriteria stereoCriteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER, 30, 1e-6);
+
+    calibrateStereoCamera(objectPoints, imagePoints, intrinsics, extrinsics, imageSize, stereoFlags, stereoCriteria);
+
+    return 0;
 }
 
 void CalibrationAssistant::computeCalibrationMatrices()
@@ -143,7 +159,7 @@ void CalibrationAssistant::computeCalibrationMatrices()
     StereoImageObjectPoints objectPoints;
     StereoImageImagePoints imagePoints;
 
-    // Define the objectPoints per image
+    // Define the real world Coordinates for points on the Chessboard
     std::vector<cv::Point3f> objp;
     for (int i = 0; i < config.boardHeight; i++)
     {
@@ -153,7 +169,7 @@ void CalibrationAssistant::computeCalibrationMatrices()
         }
     }
 
-    // Go through every frame and grab the object and image points
+    // Go through every frame and grab the object and image points if the images are valid
     for (int i = 0; i < config.numberOfFrames; i++)
     {
         StereoImage& image = images.at(i);
@@ -161,19 +177,14 @@ void CalibrationAssistant::computeCalibrationMatrices()
 
         findChessboardCorners(image, data, config);
         
-        if (data.foundLeft)
+        if (data.foundLeft && data.foundRight)
         {
             imagePoints.imagePointsLeft.push_back(data.cornersLeft);
-            objectPoints.objectPointsLeft.push_back(objp);
+            imagePoints.imagePointsRight.push_back(data.cornersRight);
+
+            objectPoints.objectPoints.push_back(objp);
 
             cv::drawChessboardCorners(image.image1, {config.boardHeight, config.boardWidth}, cv::Mat(data.cornersLeft), data.foundLeft);
-        }
-
-        if (data.foundRight)
-        {
-            imagePoints.imagePointsRight.push_back(data.cornersRight);
-            objectPoints.objectPointsRight.push_back(objp);
-
             cv::drawChessboardCorners(image.image2, {config.boardHeight, config.boardWidth}, cv::Mat(data.cornersRight), data.foundRight);
         }
     }
@@ -181,22 +192,22 @@ void CalibrationAssistant::computeCalibrationMatrices()
     // calibrating the camera
     StereoCameraIntrinsics intrinsics;
     StereoCameraExtrinsics extrinsics;
-    //int flags = cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_PRINCIPAL_POINT;
-    int flags = cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_K3 + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_PRINCIPAL_POINT;
 
-    calibrateCamera(objectPoints, imagePoints, intrinsics, extrinsics, images.at(0).image1.size(), flags);
+    int flags = cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_K1 + cv::CALIB_FIX_K2 + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5 + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_PRINCIPAL_POINT;
+
+    double error = calibrateStereoCameraSetup(objectPoints, imagePoints, intrinsics, extrinsics, images.at(0).image1.size(), flags);
+
+    std::cout << "Error: " << error << std::endl;
+
 
     // computing lens distortion
-    StereoCameraLensInterpolation interpolation;
-    //computeLensInterpolation(intrinsics, images.at(0).image1.size(), interpolation);
-
-    //cv::fisheye::estimateNewCameraMatrixForUndistortRectify(intrinsics.cameraMatrixLeft, intrinsics.cameraMatrixRight, images.at(0).image1.size(), cv::Matx33d::eye(), newCameraMatrix, 1);
+    StereoMap interpolation;
     StereoCameraRectification rect;
 
-    cv::stereoRectify(intrinsics.newCameraMatrixLeft,
-                      intrinsics.distortionCoefficientsLeft,
-                      intrinsics.newCameraMatrixRight,
-                      intrinsics.distortionCoefficientsRight,
+    cv::stereoRectify(intrinsics.left.newCameraMatrix,
+                      intrinsics.left.distortionCoefficients,
+                      intrinsics.right.newCameraMatrix,
+                      intrinsics.right.distortionCoefficients,
                       images.at(0).image1.size(),
                       extrinsics.rotationVectors,
                       extrinsics.translationVectors,
@@ -205,35 +216,33 @@ void CalibrationAssistant::computeCalibrationMatrices()
                       rect.projMatrixLeft,
                       rect.projMatrixRight,
                       rect.Q,
-                      1);
+                      1024,
+                      -1.0,
+                      images.at(0).image1.size(),
+                      &intrinsics.left.roi,
+                      &intrinsics.right.roi);
 
-    std::cout << rect.projMatrixLeft << std::endl;
-    std::cout << rect.projMatrixRight << std::endl;
-    
-    cv::initUndistortRectifyMap(intrinsics.cameraMatrixLeft,
-                                intrinsics.distortionCoefficientsLeft,
+    cv::initUndistortRectifyMap(intrinsics.left.newCameraMatrix,
+                                intrinsics.left.distortionCoefficients,
                                 rect.rectLeft,
                                 //cv::Matx33f::eye(),
-                                //rect.projMatrixLeft,
-                                intrinsics.newCameraMatrixLeft,
+                                rect.projMatrixLeft,
+                                //intrinsics.newCameraMatrixLeft,
                                 images.at(0).image1.size(),
                                 CV_32FC1,
                                 interpolation.mapXLeft,
                                 interpolation.mapYLeft);
 
-    cv::initUndistortRectifyMap(intrinsics.cameraMatrixRight,
-                                intrinsics.distortionCoefficientsRight,
+    cv::initUndistortRectifyMap(intrinsics.right.newCameraMatrix,
+                                intrinsics.right.distortionCoefficients,
                                 rect.rectRight,
                                 //cv::Matx33f::eye(),
-                                //rect.projMatrixRight,
-                                intrinsics.newCameraMatrixRight,
+                                rect.projMatrixRight,
+                                //intrinsics.newCameraMatrixRight,
                                 images.at(0).image1.size(),
                                 CV_32FC1,
-                                interpolation.mapXRight,
+                                interpolation.mapXRight, 
                                 interpolation.mapYRight);
-
-    std::cout << intrinsics.newCameraMatrixLeft << std::endl;
-    std::cout << intrinsics.newCameraMatrixRight << std::endl;
 
     for (waveshare::StereoImage image : images)
     {
@@ -242,25 +251,20 @@ void CalibrationAssistant::computeCalibrationMatrices()
         cv::Mat img = image.image1;
         cv::Mat img2 = image.image2;
 
-        //cv::undistort(img, undistorted, intrinsics.newCameraMatrixLeft, intrinsics.distortionCoefficientsLeft);
-        //cv::undistort(img2, undistorted2, intrinsics.newCameraMatrixRight, intrinsics.distortionCoefficientsRight);
-
         cv::remap(img,
                   undistorted,
                   interpolation.mapXLeft,
                   interpolation.mapYLeft,
-                  //cv::INTER_LANCZOS4,
-                  cv::INTER_LINEAR,
-                  cv::BORDER_TRANSPARENT,
+                  cv::INTER_LANCZOS4,
+                  cv::BORDER_CONSTANT,
                   0);
 
         cv::remap(img2,
                   undistorted2,
                   interpolation.mapXRight,
                   interpolation.mapYRight,
-                  //cv::INTER_LANCZOS4,
-                  cv::INTER_LINEAR,
-                  cv::BORDER_TRANSPARENT,
+                  cv::INTER_LANCZOS4,
+                  cv::BORDER_CONSTANT,
                   0);
 
         cv::imshow("Rectified 1", undistorted);

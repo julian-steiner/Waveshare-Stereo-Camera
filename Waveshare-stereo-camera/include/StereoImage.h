@@ -3,6 +3,27 @@
 
 namespace waveshare
 {
+
+    struct StereoImageChessboardData
+    {
+        bool foundRight;
+        bool foundLeft;
+
+        std::vector<cv::Point2f> cornersRight;
+        std::vector<cv::Point2f> cornersLeft;
+    };
+
+    struct StereoImageObjectPoints
+    {
+        std::vector<std::vector<cv::Point3f>> objectPoints;
+    };
+    
+    struct StereoImageImagePoints
+    {
+        std::vector<std::vector<cv::Point2f>> imagePointsLeft;
+        std::vector<std::vector<cv::Point2f>> imagePointsRight;
+    };
+
     struct ImageSize
     {
         int x;

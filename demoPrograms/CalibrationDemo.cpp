@@ -12,6 +12,7 @@ int main()
     if (keyCode == 49)
     {
         waveshare::StereoCamera camera(2, 4);
+        camera.setResolution({1280, 720});
         cfg::createDefaultConfig();
 
         waveshare::CalibrationAssistant::generateCalibrationImages(&camera);

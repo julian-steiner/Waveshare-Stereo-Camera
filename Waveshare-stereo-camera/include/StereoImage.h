@@ -3,7 +3,6 @@
 
 namespace waveshare
 {
-
     struct StereoImageChessboardData
     {
         bool foundRight;
@@ -24,14 +23,33 @@ namespace waveshare
         std::vector<std::vector<cv::Point2f>> imagePointsRight;
     };
 
+    struct RectificationMap
+    {
+        cv::Mat mapX;
+        cv::Mat mapY;
+    };
+
+    struct StereoMap
+    {
+        RectificationMap left;
+        RectificationMap right;
+    };
+
     struct ImageSize
     {
         int x;
         int y;
     };
+}
 
-    struct StereoImage
+namespace waveshare
+{
+    class StereoImage
     {
+    private:
+        void rectifySingleImage(cv::Mat& image, const RectificationMap& rectMap);
+
+    public:
         cv::Mat image1;
         cv::Mat image2;
 
@@ -43,8 +61,9 @@ namespace waveshare
 
         cv::Mat getCombinedImage();
         void show(const std::string& windowname, const bool& combined = false);
-        void saveToFile(const std::string& filename, const bool& combined = false);
-        void fromFile(const std::string& filepath);
+        void saveToFile(const std::string& folder, const std::string& filename, const bool& combined = false);
+        void fromFile(const std::string& folder, const std::string& filename);
+        void rectify(const StereoMap& stereoMap);
     };
 }
 

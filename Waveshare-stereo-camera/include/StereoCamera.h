@@ -52,12 +52,6 @@ namespace waveshare
 
         cv::Mat Q;
     };
-
-    struct StereoMap
-    {
-        cv::Mat mapXLeft, mapXRight;
-        cv::Mat mapYLeft, mapYRight;
-    };
 }
 
 namespace waveshare
@@ -71,6 +65,7 @@ namespace waveshare
         StereoCamera() = default;
         StereoCamera(int cameraPort1, int cameraPort2);
 
+        void setResolution(const ImageSize& size);
         StereoImage read();
     };
 }

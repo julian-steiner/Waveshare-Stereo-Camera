@@ -16,7 +16,7 @@ namespace cfg
 
     public:
         CalibrationConfig() : numberOfFrames(20), boardWidth(8), boardHeight(6), squareSize(20), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/") {}
-        explicit CalibrationConfig(int) : numberOfFrames(20), boardWidth(8), boardHeight(6), squareSize(20), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/"){}
+        explicit CalibrationConfig(int) : numberOfFrames(20), boardWidth(9), boardHeight(6), squareSize(22), outputFilename("CameraConfigurationData.xml"), filepathToFrames("frames/"){}
 
         void write(cv::FileStorage& fs) const;
 

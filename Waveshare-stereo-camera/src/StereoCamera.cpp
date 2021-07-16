@@ -47,7 +47,18 @@ StereoCamera::StereoCamera(int cameraPort1, int cameraPort2)
 StereoImage StereoCamera::read()
 {
     StereoImage imageBuffer;
+    double zoom = 2;
+
     camera1.read(imageBuffer.image1);
     camera2.read(imageBuffer.image2);
+
     return std::move(imageBuffer);
+}
+
+void StereoCamera::setResolution(const ImageSize& size)
+{
+    camera1.set(3, size.x);
+    camera2.set(3, size.x);
+    camera1.set(4, size.y);
+    camera2.set(4, size.y);
 }

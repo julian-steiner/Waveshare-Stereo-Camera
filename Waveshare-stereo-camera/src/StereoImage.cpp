@@ -22,12 +22,18 @@ cv::Mat StereoImage::getCombinedImage()
     return (image1 + image2) / 2;
 }
 
-void StereoImage::saveToFile(const std::string& filename, const bool& combined)
+void StereoImage::saveToFile(const std::string& folder, const std::string& filename, const bool& combined)
 {
     if (!combined)
     {
-        cv::imwrite(filename.substr(0, filename.find(".")) + "_left" + filename.substr(filename.find(".")), image1);
-        cv::imwrite(filename.substr(0, filename.find(".")) + "_right" + filename.substr(filename.find(".")), image2);
+        std::stringstream filepath1;
+        std::stringstream filepath2;
+
+        filepath1 << folder << "left/" << filename;
+        filepath2 << folder << "right/" << filename;
+
+        cv::imwrite(filepath1.str(), image1);
+        cv::imwrite(filepath2.str(), image2);
     }
 
     else
@@ -52,16 +58,39 @@ void StereoImage::show(const std::string& windowname, const bool& combined)
     }
 }
 
-void StereoImage::fromFile(const std::string& filepath)
+void StereoImage::fromFile(const std::string& folder, const std::string& filename)
 {
     try
     {
-        image1 = cv::imread(filepath.substr(0, filepath.find(".")) + "_left" + filepath.substr(filepath.find(".")));
-        image2 = cv::imread(filepath.substr(0, filepath.find(".")) + "_right" + filepath.substr(filepath.find(".")));
+        std::stringstream filepath1;
+        std::stringstream filepath2;
+
+        filepath1 << folder << "left/" << filename;
+        filepath2 << folder << "right/" << filename;
+
+        image1 = cv::imread(filepath1.str());
+        image2 = cv::imread(filepath2.str());
     }
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
     }
     
+}
+
+void StereoImage::rectifySingleImage(cv::Mat& image, const RectificationMap& rectMap)
+{
+        cv::remap(image,
+                  image,
+                  rectMap.mapX,
+                  rectMap.mapY,
+                  cv::INTER_LANCZOS4,
+                  cv::BORDER_CONSTANT,
+                  0);
+}
+
+void StereoImage::rectify(const StereoMap& stereoMap)
+{
+    rectifySingleImage(image1, stereoMap.left);
+    rectifySingleImage(image2, stereoMap.right);
 }

@@ -18,5 +18,5 @@ int main()
         waveshare::CalibrationAssistant::generateCalibrationImages(&camera);
     }
 
-    waveshare::CalibrationAssistant::computeCalibrationMatrices();
+    waveshare::CalibrationAssistant::computeCalibrationMatrices("CalibrationData.xml");
 }

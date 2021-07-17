@@ -23,6 +23,6 @@ int main()
         }
     }
 
-    img.saveToFile("images/testImage.png", true);
-    img.saveToFile("images/testImage.png", false);
+    //img.saveToFile("images/testImage.png", true);
+    //img.saveToFile("images/testImage.png", false);
 }

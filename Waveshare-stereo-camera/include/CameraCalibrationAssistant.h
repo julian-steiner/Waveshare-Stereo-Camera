@@ -15,13 +15,14 @@ namespace waveshare
         static void computeNewCameraMatrix(CameraIntrinsics& intrinsics, const cv::Size& ImageSize);
         static void calibrateStereoCamera(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags, const cv::TermCriteria& criteria);
         static void computeStereoRectification(StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, StereoCameraRectification& rect, const cv::Size& imageSize);
-        static void computeRectificationMap(const CameraIntrinsics& intrinsics, const StereoCameraRectification& rect, const cv::Size& imageSize, RectificationMap& stereoMap);
+        static void computeRectificationMap(const CameraIntrinsics& intrinsics, const CameraRectification& rect, const cv::Size& imageSize, RectificationMap& stereoMap);
         static void computeStereoMap(const StereoCameraIntrinsics& intrinsics, const StereoCameraRectification& rect, const cv::Size& imageSize, StereoMap& stereoMap);
         static double calibrateStereoCameraSetup(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags);
+        static void saveCalibrationData(const std::string& outputFilePath, const StereoCameraIntrinsics& intrinsics, const StereoMap& stereoMap);
 
     public:
         static void generateCalibrationImages(StereoCamera* camera);
-        static void computeCalibrationMatrices();
+        static void computeCalibrationMatrices(const std::string& outputFilePath);
     };
 }
 

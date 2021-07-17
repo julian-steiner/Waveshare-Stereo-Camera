@@ -14,10 +14,32 @@ namespace waveshare
     {
         cv::Mat cameraMatrix;
         cv::Mat newCameraMatrix;
-        cv::Mat distortionCoefficients = cv::Mat::zeros(8, 1, CV_64F);
+        cv::Mat distortionCoefficients;
+        //cv::Mat distortionCoefficients = cv::Mat::zeros(8, 1, CV_64F);
 
         cv::Rect roi;
+
+        void write(cv::FileStorage& fs) const;
+
+        void read(const cv::FileNode& node);
     };
+
+    static void write(cv::FileStorage& fs, const std::string&, const CameraIntrinsics& data)
+    { 
+        data.write(fs);
+    }
+    static void read(const cv::FileNode& node, CameraIntrinsics& data, const CameraIntrinsics& defaultValue)
+    {
+        if(node.empty()) data = defaultValue;
+        else data.read(node);
+    }
+    static std::ostream& operator<<(std::ostream& out, const CameraIntrinsics& data)
+    {
+        out << "{ cameraMatrix = " << data.cameraMatrix << ", ";
+        out << "newCameraMatrix = " << data.newCameraMatrix << ", ";
+        out << "distortionCoefficients = " << data.distortionCoefficients << " }";
+        return out;
+    }
 
     struct CameraExtrinsics
     {
@@ -29,7 +51,27 @@ namespace waveshare
     {
         CameraIntrinsics left;
         CameraIntrinsics right;
+
+        void write(cv::FileStorage& fs) const;
+
+        void read(const cv::FileNode& node);
     };
+
+    static void write(cv::FileStorage& fs, const std::string&, const StereoCameraIntrinsics& data)
+    { 
+        data.write(fs);
+    }
+    static void read(const cv::FileNode& node, StereoCameraIntrinsics& data, const StereoCameraIntrinsics& defaultValue)
+    {
+        if(node.empty()) data = defaultValue;
+        else data.read(node);
+    }
+    static std::ostream& operator<<(std::ostream& out, const StereoCameraIntrinsics& data)
+    {
+        out << "{ left = " << data.left << ", ";
+        out << "right = " << data.right << " }";
+        return out;
+    }
 
     struct StereoCameraExtrinsics
     {
@@ -42,14 +84,18 @@ namespace waveshare
         cv::Mat fundamentalMatrix;
     };
 
+    struct CameraRectification
+    {
+        cv::Mat rect;
+
+        cv::Mat projMatrix;
+    };
+
     struct StereoCameraRectification
     {
-        cv::Mat rectLeft;
-        cv::Mat rectRight;
-
-        cv::Mat projMatrixLeft;
-        cv::Mat projMatrixRight;
-
+        CameraRectification left;
+        CameraRectification right;
+        
         cv::Mat Q;
     };
 }
@@ -60,13 +106,18 @@ namespace waveshare
     {
         cv::VideoCapture camera1;
         cv::VideoCapture camera2;
+        bool calibrated;
 
     public:
+        StereoCameraIntrinsics intrinsics;
+        StereoMap stereoMap;
+
         StereoCamera() = default;
         StereoCamera(int cameraPort1, int cameraPort2);
 
         void setResolution(const ImageSize& size);
         StereoImage read();
+        void loadCalibrationData(const std::string& filepath);
     };
 }
 

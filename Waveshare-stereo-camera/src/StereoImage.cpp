@@ -94,3 +94,25 @@ void StereoImage::rectify(const StereoMap& stereoMap)
     rectifySingleImage(image1, stereoMap.left);
     rectifySingleImage(image2, stereoMap.right);
 }
+
+void RectificationMap::write(cv::FileStorage& fs) const
+{
+    fs << "{" << "mapX" << mapX << "mapY" << mapY << "}";
+}
+
+void RectificationMap::read(const cv::FileNode& node) 
+{
+    node["mapX"] >> mapX;
+    node["mapY"] >> mapY;
+}
+
+void StereoMap::write(cv::FileStorage& fs) const
+{
+    fs << "{" << "left" << left << "right" << right << "}";
+}
+
+void StereoMap::read(const cv::FileNode& node)
+{
+    node["left"] >> left;
+    node["right"] >> right;
+}

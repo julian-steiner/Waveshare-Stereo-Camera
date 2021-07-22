@@ -1,6 +1,8 @@
 #ifndef STEREO_IMAGE
 #define STEREO_IMAGE
 
+#include "Image.h"
+
 namespace waveshare
 {
     struct StereoImageChessboardData
@@ -82,7 +84,7 @@ namespace waveshare
 
 namespace waveshare
 {
-    class StereoImage
+    class StereoImage : public Image
     {
     private:
         void rectifySingleImage(cv::Mat& image, const RectificationMap& rectMap);
@@ -98,8 +100,8 @@ namespace waveshare
         StereoImage& operator=(const StereoImage&) = default;
 
         cv::Mat getCombinedImage();
-        void show(const std::string& windowname, const bool& combined = false);
-        void saveToFile(const std::string& folder, const std::string& filename, const bool& combined = false);
+        void show(const std::string& windowname);
+        void saveToFile(const std::string& folder, const std::string& filename);
         void fromFile(const std::string& folder, const std::string& filename);
         void rectify(const StereoMap& stereoMap);
     };

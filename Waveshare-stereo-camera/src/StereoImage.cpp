@@ -22,40 +22,27 @@ cv::Mat StereoImage::getCombinedImage()
     return (image1 + image2) / 2;
 }
 
-void StereoImage::saveToFile(const std::string& folder, const std::string& filename, const bool& combined)
+void StereoImage::saveToFile(const std::string& folder, const std::string& filename)
 {
-    if (!combined)
-    {
-        std::stringstream filepath1;
-        std::stringstream filepath2;
+    std::stringstream filepath1;
+    std::stringstream filepath2;
 
-        filepath1 << folder << "left/" << filename;
-        filepath2 << folder << "right/" << filename;
+    filepath1 << folder << "left/" << filename;
+    filepath2 << folder << "right/" << filename;
 
-        cv::imwrite(filepath1.str(), image1);
-        cv::imwrite(filepath2.str(), image2);
-    }
-
-    else
-    {
-        cv::imwrite(filename, getCombinedImage());
-    }
+    cv::imwrite(filepath1.str(), image1);
+    cv::imwrite(filepath2.str(), image2);
 }
 
-void StereoImage::show(const std::string& windowname, const bool& combined)
+void StereoImage::show(const std::string& windowname)
 {
-    if (combined)   cv::imshow(windowname, getCombinedImage());
+    std::stringstream windowname1;
+    std::stringstream windowname2;
+    windowname1 << windowname << "_left";
+    windowname2 << windowname << "_right";
 
-    else
-    {
-        std::stringstream windowname1;
-        std::stringstream windowname2;
-        windowname1 << windowname << "_left";
-        windowname2 << windowname << "_right";
-
-        cv::imshow(windowname1.str(), image1);
-        cv::imshow(windowname2.str(), image2);
-    }
+    cv::imshow(windowname1.str(), image1);
+    cv::imshow(windowname2.str(), image2);
 }
 
 void StereoImage::fromFile(const std::string& folder, const std::string& filename)
@@ -67,6 +54,9 @@ void StereoImage::fromFile(const std::string& folder, const std::string& filenam
 
         filepath1 << folder << "left/" << filename;
         filepath2 << folder << "right/" << filename;
+
+        //filepath2 << folder << "left/" << filename;
+        //filepath1 << folder << "right/" << filename;
 
         image1 = cv::imread(filepath1.str());
         image2 = cv::imread(filepath2.str());

@@ -75,10 +75,38 @@ void StereoCamera::loadCalibrationData(const std::string& filepath)
 
     storage["Intrinsics"] >> intrinsics;
     storage["StereoMap"] >> stereoMap;
+    storage["Rectification"] >> rectification;
 
     storage.release();
 
     calibrated = true;
+}
+
+waveshare::DepthImage StereoCamera::generateDepthMap()
+{
+    StereoImage image = read();
+    StereoImage disparity;
+    DepthImage depthMap;
+
+    // Initializing the stereoMatchers and filters
+    cv::Ptr<cv::StereoBM> leftMatcher = cv::StereoBM::create(16, 5);
+    cv::Ptr<cv::StereoMatcher> rightMatcher = cv::ximgproc::createRightMatcher(leftMatcher);
+
+    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wlsFilter = cv::ximgproc::createDisparityWLSFilter(leftMatcher);
+    wlsFilter->setLambda(5000);
+    wlsFilter->setSigmaColor(2);
+
+    // Coloring the image Grayscale for easier matching
+    cv::cvtColor(image.image1, image.image1, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(image.image2, image.image2, cv::COLOR_BGR2GRAY);
+
+    // Computing the left and right depth
+    leftMatcher->compute(image.image1, image.image2, disparity.image1);
+    rightMatcher->compute(image.image2, image.image1, disparity.image2);
+
+    wlsFilter->filter(disparity.image1, image.image1, depthMap.disparityMap, disparity.image2);
+
+    return std::move(depthMap);
 }
 
 void CameraIntrinsics::write(cv::FileStorage& fs) const
@@ -102,4 +130,14 @@ void StereoCameraIntrinsics::read(const cv::FileNode& node)
 {
     node["left"] >> left;
     node["right"] >> right;
+}
+
+void StereoCameraRectification::write(cv::FileStorage& fs) const
+{
+    fs << "{" << "Q" << Q << "}";
+}
+
+void StereoCameraRectification::read(const cv::FileNode& node)
+{
+    node["Q"] >> Q;
 }

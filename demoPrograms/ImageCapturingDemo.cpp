@@ -13,8 +13,7 @@ int main()
     {
         img = camera.read();
 
-        img.show("combinedImage", true);
-        img.show("separateImage", false);
+        img.show("separateImage");
 
         int keyCode = cv::waitKey(1); 
         if (keyCode == 113 || keyCode == 13)

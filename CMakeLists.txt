@@ -14,10 +14,12 @@ include_directories(
 )
 
 set(Library_SRC
+    ${WaveShare-stereo-camera_SRC}/Image.cpp
     ${WaveShare-stereo-camera_SRC}/StereoImage.cpp
     ${WaveShare-stereo-camera_SRC}/StereoCamera.cpp
     ${WaveShare-stereo-camera_SRC}/ConfigHandler.cpp
     ${WaveShare-stereo-camera_SRC}/CameraCalibrationAssistant.cpp
+    ${WaveShare-stereo-camera_SRC}/DepthImage.cpp
 )
 
 set(Library_PCH
@@ -33,3 +35,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}-ImageCapturingDemo ${CMAKE_PROJECT_N
 
 add_executable(${CMAKE_PROJECT_NAME}-CalibrationDemo demoPrograms/CalibrationDemo.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME}-CalibrationDemo ${CMAKE_PROJECT_NAME})
+
+add_executable(${CMAKE_PROJECT_NAME}-DepthDemo demoPrograms/DepthDemo.cpp)
+target_link_libraries(${CMAKE_PROJECT_NAME}-DepthDemo ${CMAKE_PROJECT_NAME})

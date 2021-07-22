@@ -3,6 +3,50 @@
 
 using namespace waveshare;
 
+void CalibrationAssistant::loadImages(const cfg::CalibrationConfig& config, std::vector<StereoImage>& images)
+{
+    std::vector<std::string> files;
+    files.reserve(config.numberOfFrames);
+    std::stringstream searchDirectory;
+    searchDirectory << config.filepathToFrames << "left/";
+
+    // Finding all the filenames in the directory
+    cv::glob(searchDirectory.str(), files);
+
+    if (files.size() > config.numberOfFrames)
+    {
+        std::cerr << "ERROR: To many images in the folder, expected: " << config.numberOfFrames << " recieved: " << files.size() << std::endl;
+    }
+
+    // Load in every file as a stereoImage
+    for (int i = 0; i < config.numberOfFrames; i++)
+    {
+        std::string filename = files.at(i);
+
+        images.emplace_back(waveshare::StereoImage());
+        std::size_t position = filename.find_last_of("/");
+        filename = filename.erase(0, position+1);
+
+        images.back().fromFile(config.filepathToFrames, filename);
+    }
+
+    if (images.size() == config.numberOfFrames) {}
+    else std::cerr << "There was an error loading the calibrationImages" << std::endl;
+}
+
+void CalibrationAssistant::generateDefaultObjectPoint(const cfg::CalibrationConfig& config, std::vector<cv::Point3f>& objp)
+{
+    // Define the real world Coordinates for points on the Chessboard
+    for (int i = 0; i < config.boardWidth; i++)
+    {
+        for (int a = 0; a < config.boardHeight; a++)
+        {
+            //objp.push_back(cv::Point3f(a * config.squareSize, i * config.squareSize, 0));
+            objp.push_back(cv::Point3f(a, i, 0));
+        }
+    }
+}
+
 void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
 {
     cfg::CalibrationConfig config = cfg::readConfig();
@@ -12,7 +56,7 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
     // Create a video stream 
     while (counter < config.numberOfFrames)
     {
-        camera->read().show("Live View", false);
+        camera->read().show("Live View");
 
         int keyCode = cv::waitKey(1);
         // If the user presses ENTER, validate the image
@@ -42,7 +86,7 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
 
                 //if (keyCode == 13)
                 {
-                    img.saveToFile(config.filepathToFrames, filename.str(), false);
+                    img.saveToFile(config.filepathToFrames, filename.str());
                     std::cout << counter+1 << " images of " << config.numberOfFrames << std::endl;
                     counter++;
                 }
@@ -83,7 +127,7 @@ void CalibrationAssistant::findChessboardCorners(const StereoImage& image, Stere
                         cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
 
         cv::cornerSubPix(grayRight,
-                         data.cornersLeft,
+                         data.cornersRight,
                          cv::Size(11, 11),
                          cv::Size(-1, -1),
                          cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::COUNT, 30, 0.0001));
@@ -99,6 +143,21 @@ void CalibrationAssistant::generateImagePoints(StereoImageImagePoints& imagePoin
         StereoImageChessboardData data;
 
         findChessboardCorners(image, data, config);
+
+        if (config.showImagesDuringCalibration)
+        {
+            cv::Mat preview1, preview2;
+            preview1 = image.image1.clone();
+            preview2 = image.image2.clone();
+
+            cv::drawChessboardCorners(preview1, {config.boardHeight, config.boardWidth}, data.cornersLeft, data.foundLeft);
+            cv::drawChessboardCorners(preview2, {config.boardHeight, config.boardWidth}, data.cornersRight, data.foundRight);
+
+            cv::imshow("PreviewLeft", preview1);
+            cv::imshow("PreviewRight", preview2);
+
+            cv::waitKey(500);
+        }
         
         if (data.foundLeft && data.foundRight)
         {
@@ -187,7 +246,7 @@ void CalibrationAssistant::computeNewCameraMatrix(CameraIntrinsics& intrinsics, 
     intrinsics.newCameraMatrix = cv::getOptimalNewCameraMatrix(intrinsics.cameraMatrix,
                                                                     intrinsics.distortionCoefficients,
                                                                     imageSize,
-                                                                    1,
+                                                                    0,
                                                                     imageSize,
                                                                     &intrinsics.roi);
 }
@@ -195,10 +254,9 @@ void CalibrationAssistant::computeNewCameraMatrix(CameraIntrinsics& intrinsics, 
 double CalibrationAssistant::calibrateStereoCameraSetup(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
 {
     // Calibrate both cameras
-
     calibrateIntrinsics(objectPoints, imagePoints.imagePointsLeft, intrinsics.left, extrinsics.left, imageSize, flags);
     calibrateIntrinsics(objectPoints, imagePoints.imagePointsRight, intrinsics.right, extrinsics.right, imageSize, flags);
-                        
+
     // Generate new, refined camera matrixes 
     computeNewCameraMatrix(intrinsics.left, imageSize);
     computeNewCameraMatrix(intrinsics.right, imageSize);
@@ -213,18 +271,20 @@ double CalibrationAssistant::calibrateStereoCameraSetup(const StereoImageObjectP
     return 0;
 }
 
-void CalibrationAssistant::saveCalibrationData(const std::string& outputFilePath, const StereoCameraIntrinsics& intrinsics, const StereoMap& stereoMap)
+void CalibrationAssistant::saveCalibrationData(const std::string& outputFilePath, const StereoCameraIntrinsics& intrinsics, const StereoMap& stereoMap, const StereoCameraRectification& rect)
 {
     cv::FileStorage storage(outputFilePath, cv::FileStorage::WRITE);
 
     storage << "Intrinsics" << intrinsics;
     storage << "StereoMap" << stereoMap;
+    storage << "Rectification" << rect;
 
     storage.release();
 }
 
 void CalibrationAssistant::computeCalibrationMatrices(const std::string& outputFilePath)
 {
+    // Variables
     cfg::CalibrationConfig config = cfg::readConfig();
     std::vector<waveshare::StereoImage> images;
     images.reserve(config.numberOfFrames);
@@ -234,52 +294,18 @@ void CalibrationAssistant::computeCalibrationMatrices(const std::string& outputF
     StereoCameraExtrinsics extrinsics;
     StereoMap stereoMap;
     StereoCameraRectification rect;
+    std::vector<cv::Point3f> objp;
 
     //int flags = cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_K1 + cv::CALIB_FIX_K2 + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5 + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_PRINCIPAL_POINT;
-    //int flags =  cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_PRINCIPAL_POINT + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_K3;
-    int flags = 0;
+    int flags =  cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_PRINCIPAL_POINT + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_K3;
+    //int flags = 0;
 
-    // Load in all the images from the folder
-    std::vector<std::string> files;
-    files.reserve(config.numberOfFrames);
+    loadImages(config, images);
 
-    std::stringstream searchDirectory;
-    searchDirectory << config.filepathToFrames << "left/";
-
-    cv::glob(searchDirectory.str(), files);
-
-    if (files.size() > config.numberOfFrames)
-    {
-        std::cerr << "ERROR: To many images in the folder, expected: " << config.numberOfFrames << " recieved: " << files.size() << std::endl;
-    }
-
-    for (int i = 0; i < config.numberOfFrames; i++)
-    {
-        std::string filename = files.at(i);
-
-        images.emplace_back(waveshare::StereoImage());
-        std::size_t position = filename.find_last_of("/");
-        filename = filename.erase(0, position+1);
-
-        images.back().fromFile(config.filepathToFrames, filename);
-    }
-
-    if (images.size() == config.numberOfFrames) {}
-    else std::cerr << "There was an error loading the calibrationImages" << std::endl;
-
-    // Define the real world Coordinates for points on the Chessboard
-    std::vector<cv::Point3f> objp;
-    for (int i = 0; i < config.boardWidth; i++)
-    {
-        for (int a = 0; a < config.boardHeight; a++)
-        {
-            //objp.push_back(cv::Point3f(a * config.squareSize, i * config.squareSize, 0));
-            objp.push_back(cv::Point3f(a, i, 0));
-        }
-    }
+    generateDefaultObjectPoint(config, objp);
 
     generateImagePoints(imagePoints, objectPoints, images, config, objp);
-    
+
     // calibrating the camera
     double error = calibrateStereoCameraSetup(objectPoints, imagePoints, intrinsics, extrinsics, images.at(0).image1.size(), flags);
 
@@ -287,21 +313,5 @@ void CalibrationAssistant::computeCalibrationMatrices(const std::string& outputF
     
     computeStereoMap(intrinsics, rect, images.at(0).image1.size(), stereoMap);
 
-    for (waveshare::StereoImage image : images)
-    {
-        cv::Mat left = image.image1.clone();
-        cv::Mat leftN;
-        cv::undistort(left, leftN, intrinsics.left.cameraMatrix, intrinsics.left.distortionCoefficients, intrinsics.left.newCameraMatrix);
-        cv::imshow("Left calibration", leftN);
-
-        image.show("before", false);
-
-        image.rectify(stereoMap);
-
-        image.show("Rectified Image", false);
-
-        cv::waitKey(0);
-    }
-
-    saveCalibrationData(outputFilePath, intrinsics, stereoMap);
+    saveCalibrationData(outputFilePath, intrinsics, stereoMap, rect);
 }

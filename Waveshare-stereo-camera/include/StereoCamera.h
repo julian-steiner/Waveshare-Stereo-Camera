@@ -2,6 +2,7 @@
 #define WAVESHARE_STEREO_CAMERA_BASE
 
 #include "StereoImage.h"
+#include "DepthImage.h"
 
 namespace waveshare
 {
@@ -97,7 +98,26 @@ namespace waveshare
         CameraRectification right;
         
         cv::Mat Q;
+
+        void write(cv::FileStorage& fs) const;
+
+        void read(const cv::FileNode& node);
     };
+
+    static void write(cv::FileStorage& fs, const std::string&, const StereoCameraRectification& data)
+    { 
+        data.write(fs);
+    }
+    static void read(const cv::FileNode& node, StereoCameraRectification& data, const StereoCameraRectification& defaultValue)
+    {
+        if(node.empty()) data = defaultValue;
+        else data.read(node);
+    }
+    static std::ostream& operator<<(std::ostream& out, const StereoCameraRectification& data)
+    {
+        out << "{ Q = " << data.Q << " }";
+        return out;
+    }
 }
 
 namespace waveshare
@@ -111,12 +131,14 @@ namespace waveshare
     public:
         StereoCameraIntrinsics intrinsics;
         StereoMap stereoMap;
+        StereoCameraRectification rectification;
 
         StereoCamera() = default;
         StereoCamera(int cameraPort1, int cameraPort2);
 
         void setResolution(const ImageSize& size);
         StereoImage read();
+        waveshare::DepthImage generateDepthMap();
         void loadCalibrationData(const std::string& filepath);
     };
 }

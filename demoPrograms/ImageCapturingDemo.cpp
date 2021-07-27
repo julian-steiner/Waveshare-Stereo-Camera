@@ -6,22 +6,18 @@ int main()
 {
     waveshare::StereoCamera camera(2, 4);
     waveshare::StereoImage img;
+    camera.setResolution({1280, 720});
 
-    std::cout << "Press ENTER or q to stop the stream and save the last image" << std::endl;
+    camera.startVideoStream("Hello World");
 
-    while (true)
-    {
-        img = camera.read();
+    std::cin.get();
 
-        img.show("separateImage");
+    camera.endVideoStream();
 
-        int keyCode = cv::waitKey(1); 
-        if (keyCode == 113 || keyCode == 13)
-        {
-            break;
-        }
-    }
+    img = camera.read();
 
-    //img.saveToFile("images/testImage.png", true);
-    //img.saveToFile("images/testImage.png", false);
+    img.saveToFile("images/", "testImage.png");
+    img.saveToFile("images/", "testImage.png");
+
+    std::cout << "saved" << std::endl;
 }

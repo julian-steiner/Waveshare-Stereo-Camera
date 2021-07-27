@@ -13,7 +13,7 @@ namespace waveshare
 {
     struct CameraIntrinsics
     {
-        cv::Mat cameraMatrix;
+        cv::Matx33f cameraMatrix = cv::Matx33f::eye();
         cv::Mat newCameraMatrix;
         cv::Mat distortionCoefficients;
         //cv::Mat distortionCoefficients = cv::Mat::zeros(8, 1, CV_64F);
@@ -127,6 +127,10 @@ namespace waveshare
         cv::VideoCapture camera1;
         cv::VideoCapture camera2;
         bool calibrated;
+        bool videoThreadRunning;
+        std::thread videoThread;
+
+        static void videoTask(StereoCamera* camera, const std::string& name);
 
     public:
         StereoCameraIntrinsics intrinsics;
@@ -140,6 +144,9 @@ namespace waveshare
         StereoImage read();
         waveshare::DepthImage generateDepthMap();
         void loadCalibrationData(const std::string& filepath);
+
+        void startVideoStream(const std::string&);
+        void endVideoStream();
     };
 }
 

@@ -4,44 +4,49 @@ using namespace waveshare;
 
 StereoCamera::StereoCamera(int cameraPort1, int cameraPort2)
 {
-    camera1 = cv::VideoCapture(cameraPort1);
-    camera2 = cv::VideoCapture(cameraPort2);
+    do
+    {
+        camera1 = cv::VideoCapture(cameraPort1);
+        camera2 = cv::VideoCapture(cameraPort2);
     
-    try
-    {
-        if (!camera1.isOpened() && !camera2.isOpened())
+        try
         {
-            std::throw_with_nested<int>(101);
+            if (!camera1.isOpened() && !camera2.isOpened())
+            {
+                throw 101;
+            }
+
+            if (!camera1.isOpened())
+            {
+                throw 102;
+            }
+
+            if (!camera2.isOpened())
+            {
+                throw 103;
+            }
         }
 
-        if (!camera1.isOpened())
+        catch(int errorCode)
         {
-            throw 102;
-        }
+            if (errorCode == 101) 
+            {
+                std::cerr << "Camera 1 and 2 are not connected" << std::endl;
+            }
 
-        if (!camera2.isOpened())
-        {
-            throw 103;
-        }
-    }
+            else if (errorCode == 102) 
+            {
+                std::cerr << "Camera 1 is not connected" << std::endl;
+            }
 
-    catch(int errorCode)
-    {
-        if (errorCode == 101) 
-        {
-            std::cout << "Camera 1 and 2 are not connected" << std::endl;
-        }
+            else if (errorCode == 103) 
+            {
+                std::cerr << "Camera 2 is not connected" << std::endl;
+            }
 
-        else if (errorCode == 102) 
-        {
-            std::cout << "Camera 1 is not connected" << std::endl;
+            usleep(1000000);
         }
-
-        else if (errorCode == 103) 
-        {
-            std::cout << "Camera 2 is not connected" << std::endl;
-        }
-    }
+    } while (!camera1.isOpened() || !camera2.isOpened());
 }
 
 StereoImage StereoCamera::read()
@@ -85,28 +90,31 @@ void StereoCamera::loadCalibrationData(const std::string& filepath)
 waveshare::DepthImage StereoCamera::generateDepthMap()
 {
     StereoImage image = read();
-    StereoImage disparity;
-    DepthImage depthMap;
+    return std::move(DepthImage::computeFromStereoImage(image, 8000, 2));
+}
 
-    // Initializing the stereoMatchers and filters
-    cv::Ptr<cv::StereoBM> leftMatcher = cv::StereoBM::create(16, 5);
-    cv::Ptr<cv::StereoMatcher> rightMatcher = cv::ximgproc::createRightMatcher(leftMatcher);
+void StereoCamera::videoTask(StereoCamera* camera, const std::string& name)
+{
+    while (true && camera->videoThreadRunning)
+    {
+        waveshare::StereoImage img = camera->read();
 
-    cv::Ptr<cv::ximgproc::DisparityWLSFilter> wlsFilter = cv::ximgproc::createDisparityWLSFilter(leftMatcher);
-    wlsFilter->setLambda(5000);
-    wlsFilter->setSigmaColor(2);
+        img.show(name);
 
-    // Coloring the image Grayscale for easier matching
-    cv::cvtColor(image.image1, image.image1, cv::COLOR_BGR2GRAY);
-    cv::cvtColor(image.image2, image.image2, cv::COLOR_BGR2GRAY);
+        cv::waitKey(1);
+    }
+}
 
-    // Computing the left and right depth
-    leftMatcher->compute(image.image1, image.image2, disparity.image1);
-    rightMatcher->compute(image.image2, image.image1, disparity.image2);
+void StereoCamera::startVideoStream(const std::string& name)
+{
+    videoThreadRunning = true;
+    videoThread = std::thread(videoTask, this, name);
+}
 
-    wlsFilter->filter(disparity.image1, image.image1, depthMap.disparityMap, disparity.image2);
-
-    return std::move(depthMap);
+void StereoCamera::endVideoStream()
+{
+    videoThreadRunning = false;
+    videoThread.join();
 }
 
 void CameraIntrinsics::write(cv::FileStorage& fs) const

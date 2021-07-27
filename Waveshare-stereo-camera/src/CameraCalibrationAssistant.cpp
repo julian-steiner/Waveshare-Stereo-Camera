@@ -41,8 +41,7 @@ void CalibrationAssistant::generateDefaultObjectPoint(const cfg::CalibrationConf
     {
         for (int a = 0; a < config.boardHeight; a++)
         {
-            //objp.push_back(cv::Point3f(a * config.squareSize, i * config.squareSize, 0));
-            objp.push_back(cv::Point3f(a, i, 0));
+            objp.push_back(cv::Point3f(i * config.squareSize, a * config.squareSize, 0));
         }
     }
 }
@@ -93,6 +92,7 @@ void CalibrationAssistant::generateCalibrationImages(StereoCamera* camera)
             }
         }
     }
+    cv::destroyAllWindows();
 }
 
 void CalibrationAssistant::findChessboardCorners(const StereoImage& image, StereoImageChessboardData& data, const cfg::CalibrationConfig& config)
@@ -167,9 +167,10 @@ void CalibrationAssistant::generateImagePoints(StereoImageImagePoints& imagePoin
             objectPoints.objectPoints.push_back(defaultObjectPoint);
         }
     }
+    cv::destroyAllWindows();
 }
 
-void CalibrationAssistant::calibrateIntrinsics(const StereoImageObjectPoints& objectPoints, const std::vector<std::vector<cv::Point2f>>& imagePoints, CameraIntrinsics& intrinsics, CameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
+double CalibrationAssistant::calibrateIntrinsics(const StereoImageObjectPoints& objectPoints, const std::vector<std::vector<cv::Point2f>>& imagePoints, CameraIntrinsics& intrinsics, CameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
 {
     double error = cv::calibrateCamera(objectPoints.objectPoints,
                         imagePoints,
@@ -179,6 +180,7 @@ void CalibrationAssistant::calibrateIntrinsics(const StereoImageObjectPoints& ob
                         extrinsics.translationVectors,
                         flags);
     std::cout << "CalibrationError: " << error << std::endl;
+    return error;
 }
 
 void CalibrationAssistant::calibrateStereoCamera(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags, const cv::TermCriteria& criteria)
@@ -197,7 +199,7 @@ void CalibrationAssistant::calibrateStereoCamera(const StereoImageObjectPoints& 
                         extrinsics.fundamentalMatrix,
                         flags,
                         criteria);
-    std::cout << "CalibrationError: " << error << std::endl;
+    std::cout << "StereoCam CalibrationError: " << error << std::endl;
 }
 
 void CalibrationAssistant::computeStereoRectification(StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, StereoCameraRectification& rect, const cv::Size& imageSize)
@@ -224,11 +226,9 @@ void CalibrationAssistant::computeStereoRectification(StereoCameraIntrinsics& in
 void CalibrationAssistant::computeRectificationMap(const CameraIntrinsics& intrinsics, const CameraRectification& rect, const cv::Size& imageSize, RectificationMap& stereoMap)
 {
     cv::initUndistortRectifyMap(intrinsics.cameraMatrix,
-                                //intrinsics.newCameraMatrix,
                                 intrinsics.distortionCoefficients,
                                 rect.rect,
                                 rect.projMatrix,
-                                //intrinsics.newCameraMatrix,
                                 imageSize,
                                 CV_32FC1,
                                 stereoMap.mapX,
@@ -244,26 +244,34 @@ void CalibrationAssistant::computeStereoMap(const StereoCameraIntrinsics& intrin
 void CalibrationAssistant::computeNewCameraMatrix(CameraIntrinsics& intrinsics, const cv::Size& imageSize)
 {
     intrinsics.newCameraMatrix = cv::getOptimalNewCameraMatrix(intrinsics.cameraMatrix,
-                                                                    intrinsics.distortionCoefficients,
-                                                                    imageSize,
-                                                                    0,
-                                                                    imageSize,
-                                                                    &intrinsics.roi);
+                                                               intrinsics.distortionCoefficients,
+                                                               imageSize,
+                                                               1,
+                                                               imageSize,
+                                                               &intrinsics.roi);
 }
 
 double CalibrationAssistant::calibrateStereoCameraSetup(const StereoImageObjectPoints& objectPoints, const StereoImageImagePoints& imagePoints, StereoCameraIntrinsics& intrinsics, StereoCameraExtrinsics& extrinsics, const cv::Size& imageSize, const int& flags)
 {
     // Calibrate both cameras
-    calibrateIntrinsics(objectPoints, imagePoints.imagePointsLeft, intrinsics.left, extrinsics.left, imageSize, flags);
-    calibrateIntrinsics(objectPoints, imagePoints.imagePointsRight, intrinsics.right, extrinsics.right, imageSize, flags);
+    double leftError = calibrateIntrinsics(objectPoints, imagePoints.imagePointsLeft, intrinsics.left, extrinsics.left, imageSize, flags);
+    double rightError = calibrateIntrinsics(objectPoints, imagePoints.imagePointsRight, intrinsics.right, extrinsics.right, imageSize, flags);
 
     // Generate new, refined camera matrixes 
-    computeNewCameraMatrix(intrinsics.left, imageSize);
-    computeNewCameraMatrix(intrinsics.right, imageSize);
+    // Choose the calibration of the camera with the lower error for the whole setup because the cameras are the same
+    if (leftError <= rightError)
+    {
+        computeNewCameraMatrix(intrinsics.left, imageSize);
+        intrinsics.right = intrinsics.left;
+    }
+    else
+    {
+        computeNewCameraMatrix(intrinsics.right, imageSize);
+        intrinsics.right = intrinsics.left;
+    }
 
     // Calibrate the camera as a stereo setup
-    int stereoFlags = 0;
-    stereoFlags |= cv::CALIB_FIX_INTRINSIC | cv::CALIB_SAME_FOCAL_LENGTH;
+    int stereoFlags = cv::CALIB_FIX_INTRINSIC + cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_ZERO_TANGENT_DIST;
     cv::TermCriteria stereoCriteria = cv::TermCriteria(cv::TermCriteria::EPS+cv::TermCriteria::MAX_ITER, 30, 1e-6);
 
     calibrateStereoCamera(objectPoints, imagePoints, intrinsics, extrinsics, imageSize, stereoFlags, stereoCriteria);
@@ -297,8 +305,8 @@ void CalibrationAssistant::computeCalibrationMatrices(const std::string& outputF
     std::vector<cv::Point3f> objp;
 
     //int flags = cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_K1 + cv::CALIB_FIX_K2 + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5 + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_PRINCIPAL_POINT;
-    int flags =  cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_PRINCIPAL_POINT + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_K3;
-    //int flags = 0;
+    //int flags =  cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_FIX_PRINCIPAL_POINT + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_FIX_K3;
+    int flags = 0;
 
     loadImages(config, images);
 
@@ -314,4 +322,13 @@ void CalibrationAssistant::computeCalibrationMatrices(const std::string& outputF
     computeStereoMap(intrinsics, rect, images.at(0).image1.size(), stereoMap);
 
     saveCalibrationData(outputFilePath, intrinsics, stereoMap, rect);
+
+    cv::Mat testImg = images[0].image1;
+    cv::Mat undistorted;
+
+    cv::undistort(testImg, undistorted, intrinsics.left.cameraMatrix, intrinsics.left.distortionCoefficients, intrinsics.left.newCameraMatrix);
+
+    cv::imshow("test", undistorted);
+
+    cv::waitKey(0);
 }

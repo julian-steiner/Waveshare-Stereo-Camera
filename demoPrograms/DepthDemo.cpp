@@ -14,8 +14,9 @@ int main()
     while (true)
     {
         depth = camera.generateDepthMap();
-        depth.visualize(10);
-        depth.colorize(cv::ColormapTypes::COLORMAP_BONE);
+        depth.visualize(20);
+        //depth.colorize(cv::ColormapTypes::COLORMAP_BONE);
+        depth.colorize(cv::ColormapTypes::COLORMAP_JET);
         depth.show("DepthMap");
 
         int keyCode = cv::waitKey(1);

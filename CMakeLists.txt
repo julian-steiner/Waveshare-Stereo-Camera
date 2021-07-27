@@ -26,9 +26,12 @@ set(Library_PCH
     ${WaveShare-stereo-camera_PCH}/ProjectHeader.pch
 )
 
+find_package(Threads REQUIRED)
+
 add_library(${CMAKE_PROJECT_NAME} ${Library_SRC})
 target_precompile_headers(${CMAKE_PROJECT_NAME} PUBLIC ${Library_PCH})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${OpenCV_LIBS})
+target_link_libraries(${CMAKE_PROJECT_NAME} Threads::Threads)
 
 add_executable(${CMAKE_PROJECT_NAME}-ImageCapturingDemo demoPrograms/ImageCapturingDemo.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME}-ImageCapturingDemo ${CMAKE_PROJECT_NAME})
